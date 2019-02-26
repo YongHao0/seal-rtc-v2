@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="./css/main.css">
+  <link rel="icon" href="./css/img/icon.png" type="image/x-icon" />
+  <script src="./lib/protobuf-2.3.4.min.js"></script>
+  <script src="./lib/RongIMLib-2.4.0.js"></script>
+  <script src="./lib/RongRTC.3.0.0.js"></script>
+  <script src="./lib/frameImage.js"></script>
+  <script src="./lib/screenshare.js"></script>
+  <script src="./lib/media.js"></script>
+  <script src="./js/mock/user.js"></script>
+  <script src="./config.js"></script>
+  <title>SealRTC v2.0.0</title>
+</head>
+<body lang="zh">
+  <video id="test"></video>
+  <!-- Login -->
+  <div id="RongLogin" class="rong-wrap rong-login">
+    <div class="rong-login-content">
+      <img class="rong-login-logo" src="./css/img/logo.png">
+      <h3 class="rong-login-title">SealRTC v2.0.0</h3>
+      <input id="roomId" class="rong-login-input" type="text" lang-placeholder="roomId">
+      <input id="userId" class="rong-login-input" type="text" lang-placeholder="userId">
+      <div class="rong-opt-stream">
+        <div class="rong-opt-checkbox">
+          <input type="checkbox" id="isCloseVideo" name="isCloseVideo"><label for="isCloseVideo"></label><span lang-textContent="closeVideo"></span>
+        </div><div class="rong-opt-checkbox">
+          <input type="checkbox" id="isCloseAudio" name="isCloseAudio"><label for="isCloseAudio"></label><span lang-textContent="closeAudio"></span>
+        </div>
+      </div>
+      <input id="start" class="rong-btn-start" type="button" lang-value="startRTC">
+    </div>
+    <div class="rong-opt-resolution">
+      <div class="rong-resolution-wrap">
+        <div class="rong-resolution-content">
+          <i class="rong-resolution-arrow"></i>
+          <h5 class="rong-resolution-title" lang-textContent="setting"></h5>
+          <ul>
+            <li lang-textContent="resolution"></li>
+            <li>
+              <input id="Rl-320-240" value="320*240" type="radio" name="resolution">
+              <label for="Rl-320-240"></label>
+              <span>320 * 240</span>
+            </li>
+            <li>
+              <input id="Rl-640-480" value="640*480" type="radio" name="resolution" checked>
+              <label for="Rl-640-480"></label>
+              <span>640 * 480</span>
+            </li>
+            <li>
+              <input id="Rl-1280-720" value="1280*720" type="radio" name="resolution">
+              <label for="Rl-1280-720"></label>
+              <span>1280 * 720</span>
+            </li>
+            <li>
+              <input id="Rl-1920-1080" value="1920*1080" type="radio" name="resolution">
+              <label for="Rl-1920-1080"></label>
+              <span>1920 * 1080</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RTC -->
+  <div id="RongRTC" class="rong-wrap rong-rtc">
+    <div class="rong-rtc-opt">
+      <span class="rong-rtc-title rong-user-title"></span>
+      <span class="rong-rtc-title rong-room-title"></span>
+      <a class="rong-rtc-btn rong-opt-hangup" lang-title="hangup"></a>
+      <!-- <a class="rong-rtc-btn rong-opt-wb" lang-title="whiteboard"></a> -->
+      <a class="rong-rtc-btn rong-opt-share" lang-title="screenshare"></a>
+    </div>
+    <div id="RongWB" class="rong-wb-box">
+      <a class="rong-wb-close"></a>
+      <iframe id="rongWhiteboard" class="rong-whiteboard" src="" frameborder="0"></iframe>
+    </div>
+    <div class="rong-stream-wrap"></div>
+  </div>
+
+  <script id="RongStreamList" type="text/x-template">
+    <div class="rong-stream-list"></div>
+  </script>
+
+  <script id="RongStreamBox" type="text/x-template">
+    <div class="rong-stream-box">
+      <video class="rong-video" autoplay></video>
+      <div class="rong-share-cover rong-rtc-cover">
+        <div class="rong-cover-content">
+          <img src="./css/img/share-cover.png">
+          <p class="rong-sharecover-title" lang-textContent="screenshareBusy"></p>
+        </div>
+      </div>
+      <div class="rong-audio-cover rong-rtc-cover">
+        <div class="rong-cover-content">
+          <img src="./css/img/audio-cover.png">
+          <p class="rong-audiocover-title" lang-textContent="videoClosed"></p>
+          <p class="rong-audiocover-title-other" lang-textContent="otherVideoClosed"></p>
+        </div>
+      </div>
+      <p class="rong-user-name">{name}</p>
+      <div class="rong-stream-opt">
+        <a class="rong-opt-btn rong-opt-video"></a>
+        <a class="rong-opt-btn rong-opt-audio"></a>
+      </div>
+    </div>
+  </script>
+
+  <script id="RongAlert" type="text/x-template">
+    <div class="rong-alert-box">
+      <div class="rong-alert">
+        <p class="rong-alert-title" lang-textContent="alertTitle"></p>
+        <p class="rong-alert-content">{content}</p>
+        <div class="rong-alert-btn-box">
+          <input class="rong-alert-cancel" style="display: {cancelDisplay}" type="button" lang-value="cancel">
+          <input class="rong-alert-confirm" type="button" lang-value="conform">
+        </div>
+      </div>
+    </div>
+  </script>
+
+  <script src="./js/locale/en.js"></script>
+  <script src="./js/locale/zh.js"></script>
+  <script src="./js/utils.js"></script>
+  <script src="./js/common.js"></script>
+  <script src="./js/im.js"></script>
+  <script src="./js/login.js"></script>
+  <script src="./js/main.js"></script>
+</body>
+</html>
