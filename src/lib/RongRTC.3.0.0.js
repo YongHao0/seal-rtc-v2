@@ -286,7 +286,7 @@
     this.produce = function (res) {
       data.push(res);
     };
-    this.consume = function (callback) {
+    this.consume = function (callback, finished) {
       if (isConsuming) {
         return;
       }
@@ -295,11 +295,15 @@
         var res = data.shift();
         if (isUndefined(res)) {
           isConsuming = false;
+          finished && finished();
           return;
         }
         callback(res, next);
       };
       next();
+    };
+    this.isExeuting = function () {
+      return isConsuming;
     };
   }
   /* 
@@ -1145,7 +1149,8 @@
     JOINED: 'common_joined',
     LEFT: 'common_left',
     ERROR: 'common_error',
-    CONSUME: 'common_consume'
+    CONSUME: 'common_consume',
+    CONSUME_FINISHED: 'common_consume_finished'
   };
 
   var PeerConnection = function (_EventEmitter) {
@@ -1317,12 +1322,12 @@
         var pc = context.pc;
 
         var option = context.getOption();
-        pc.createOffer(function (desc) {
-          callback(context.renameCodec(desc));
-        }, function () {}, option);
-        // pc.createOffer(option).then(desc => {
-        //   callback(context.renameCodec(desc));
-        // });
+        var success = function success(desc) {
+          desc = context.renameCodec(desc);
+          callback && callback(desc);
+          return desc;
+        };
+        return pc.createOffer(option).then(success);
       }
     }, {
       key: 'renameStream',
@@ -2239,6 +2244,8 @@
           });
           next();
         });
+      }, function () {
+        eventEmitter.emit(CommonEvent.CONSUME_FINISHED);
       });
     });
     var getUId = function getUId(user, tpl) {
@@ -2446,31 +2453,26 @@
       },
       SET_USERINFO: 'uris'
     };
-    var publish = function publish(user) {
-      var streams = user.stream;
-
-      if (!utils.isArray(streams)) {
-        streams = [streams];
+    var publishTempStreams = [];
+    var publishInvoke = function publishInvoke(users) {
+      if (!utils.isArray(users)) {
+        users = [users];
       }
-      var id = user.id;
-
-      utils.forEach(streams, function (stream) {
-        var mediaStream = stream.mediaStream,
-            size = stream.size;
-
-        var streamId = pc.getStreamId({
-          id: id,
-          stream: stream
-        }, size);
-        StreamCache.set(streamId, mediaStream);
+      utils.forEach(users, function (user) {
+        pc.addStream(user);
       });
+
+      var _users = users,
+          _users2 = slicedToArray(_users, 1),
+          user = _users2[0];
+
       var roomId = im.getRoomId();
       Logger$1.log(LogTag.STREAM_HANDLER, {
         msg: 'publish:start',
         roomId: roomId,
         user: user
       });
-      return pc.addStream(user).then(function (desc) {
+      return pc.createOffer(user).then(function (desc) {
         pc.setOffer(desc);
         return getBody().then(function (body) {
           var url = utils.tplEngine(Path.SUBSCRIBE, {
@@ -2502,10 +2504,41 @@
             });
             return error;
           }).then(function (result) {
+            publishTempStreams.length = 0;
             return exchangeHandler(result, user, Message.PUBLISH);
           });
         });
       });
+    };
+    eventEmitter.on(CommonEvent.CONSUME_FINISHED, function () {
+      if (!utils.isEmpty(publishTempStreams)) {
+        publishInvoke(publishTempStreams);
+      }
+    });
+    var publish = function publish(user) {
+      var streams = user.stream;
+
+      if (!utils.isArray(streams)) {
+        streams = [streams];
+      }
+      var id = user.id;
+
+      utils.forEach(streams, function (stream) {
+        var mediaStream = stream.mediaStream,
+            size = stream.size;
+
+        var streamId = pc.getStreamId({
+          id: id,
+          stream: stream
+        }, size);
+        StreamCache.set(streamId, mediaStream);
+      });
+
+      if (prosumer.isExeuting()) {
+        publishTempStreams.push(user);
+        return utils.Defer.resolve();
+      }
+      return publishInvoke(user);
     };
     var unpublish = function unpublish(user) {
       user = utils.clone(user);

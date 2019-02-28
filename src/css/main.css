@@ -583,3 +583,13 @@ ul, li {
   background-color: #4e6caa;
   color: white;
 }
+
+.rong-seal-toast {
+  position: absolute;
+  color: #fff;
+  z-index: 12;
+}
+
+.rong-loading-img {
+  background-image: url("./img/loading-img.gif");
+}
