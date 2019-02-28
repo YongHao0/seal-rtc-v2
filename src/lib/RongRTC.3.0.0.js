@@ -105,6 +105,9 @@
   var isContain = function isContain(str, keyword) {
     return str.indexOf(keyword) > -1;
   };
+  var isEqual = function isEqual(source, target) {
+    return source === target;
+  };
   var Cache = function Cache(cache) {
     if (!isObject(cache)) {
       cache = {};
@@ -137,7 +140,34 @@
     };
   };
   var request = function request(url, option) {
-    return fetch(url, option);
+    return deferred(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      var method = option.method || 'GET';
+      xhr.open(method, url, true);
+      var headers = option.headers || {};
+      forEach(headers, function (header, name) {
+        xhr.setRequestHeader(name, header);
+      });
+      var body = option.body;
+      var isSuccess = function isSuccess() {
+        return (/^(200|202)$/.test(xhr.status)
+        );
+      };
+      xhr.onreadystatechange = function () {
+        if (isEqual(xhr.readyState, 4)) {
+          var responseText = xhr.responseText;
+
+          var result = JSON.parse(responseText);
+          if (isSuccess()) {
+            resolve(result);
+          } else {
+            reject(result);
+          }
+        }
+      };
+      xhr.send(body);
+    });
+    // return fetch(url, option);
   };
   var map = function map(arrs, callback) {
     return arrs.map(callback);
@@ -159,9 +189,6 @@
   };
   var some = function some(arrs, callback) {
     return arrs.some(callback);
-  };
-  var isEqual = function isEqual(source, target) {
-    return source === target;
   };
   var isEmpty = function isEmpty(obj) {
     var result = true;
@@ -1094,8 +1121,6 @@
           headers: {
             'Content-Type': 'application/json'
           }
-        }).then(function (response) {
-          return response.json();
         });
       }
     }]);
@@ -1133,7 +1158,9 @@
 
       var context = _this;
       var pc = new RTCPeerConnection({
-        sdpSemantics: 'plan-b'
+        sdpSemantics: 'plan-b',
+        // Chrome 49 Test
+        iceServers: []
       });
       var events = {
         onaddstream: function onaddstream(event) {
@@ -1254,29 +1281,33 @@
           stream = [stream];
         }
         var option = context.getOption();
-        return pc.createOffer(option).then(function (desc) {
-          utils.forEach(stream, function (_ref3) {
-            var mediaStream = _ref3.mediaStream,
-                size = _ref3.size;
+        return utils.deferred(function (resole, reject) {
+          pc.createOffer(function (desc) {
+            utils.forEach(stream, function (_ref3) {
+              var mediaStream = _ref3.mediaStream,
+                  size = _ref3.size;
 
-            var newStreamId = context.getStreamId(user, size);
-            var streamId = mediaStream.id;
-            var _desc = desc,
-                sdp = _desc.sdp;
+              var newStreamId = context.getStreamId(user, size);
+              var streamId = mediaStream.id;
+              var _desc = desc,
+                  sdp = _desc.sdp;
 
-            sdp = context.renameStream(sdp, {
-              name: streamId,
-              newName: newStreamId
+              sdp = context.renameStream(sdp, {
+                name: streamId,
+                newName: newStreamId
+              });
+              utils.extend(desc, {
+                sdp: sdp
+              });
             });
-            utils.extend(desc, {
-              sdp: sdp
+            desc = context.renameCodec(desc);
+            utils.extend(context, {
+              desc: desc
             });
-          });
-          desc = context.renameCodec(desc);
-          utils.extend(context, {
-            desc: desc
-          });
-          return desc;
+            resole(desc);
+          }, function (error) {
+            reject(error);
+          }, option);
         });
       }
     }, {
@@ -1286,9 +1317,12 @@
         var pc = context.pc;
 
         var option = context.getOption();
-        pc.createOffer(option).then(function (desc) {
+        pc.createOffer(function (desc) {
           callback(context.renameCodec(desc));
-        });
+        }, function () {}, option);
+        // pc.createOffer(option).then(desc => {
+        //   callback(context.renameCodec(desc));
+        // });
       }
     }, {
       key: 'renameStream',
@@ -2242,14 +2276,7 @@
         DataCache.set(key, uri);
       });
     });
-    im.on(DownEvent.STREAM_UNPUBLISHED, function (error, user) {
-      if (error) {
-        throw error;
-      }
-      dispatchStreamEvent(user, function (key) {
-        DataCache.remove(key);
-      });
-    });
+
     im.on(DownEvent.STREAM_CHANGED, function (error, user) {
       if (error) {
         throw error;
@@ -2799,6 +2826,10 @@
       var uris = getFitUris(user, type, state);
       // uris 为空表示没有发布资源，不需要修改
       if (!utils.isEmpty(uris)) {
+        var id = user.id;
+
+        var fullUris = PubResourceCache.get(id);
+        im.setUserInfo(User.SET_USERINFO, fullUris);
         im.sendMessage({
           type: Message.MODIFY,
           content: {
@@ -2831,6 +2862,55 @@
       var isEnabled = true;
       return modifyTrack(user, StreamType.VIDEO, StreamState.ENABLE, isEnabled);
     };
+    var getUsersById = function getUsersById(user) {
+      var id = user.id;
+
+      var subs = SubscribeCache.get(id);
+      var streams = {},
+          msTypes = {};
+      utils.forEach(subs, function (_ref4) {
+        var msid = _ref4.msid,
+            tag = _ref4.tag,
+            type = _ref4.type;
+
+        streams[msid] = tag;
+        var types = msTypes[msid] || [];
+        types.push(type);
+        msTypes[msid] = types;
+      });
+      var users = [];
+      utils.forEach(streams, function (tag, msid) {
+        var types = msTypes[msid] || [];
+        var type = msTypes[0];
+        type = utils.isEqual(types.length, 2) ? StreamType.AUDIO_AND_VIDEO : type;
+        users.push({
+          id: id,
+          stream: {
+            tag: tag,
+            type: type
+          }
+        });
+      });
+      return users;
+    };
+    im.on(DownEvent.ROOM_USER_LEFT, function (error, user) {
+      if (error) {
+        throw error;
+      }
+      var users = getUsersById(user);
+      utils.forEach(users, function (user) {
+        unsubscribe(user);
+      });
+    });
+    im.on(DownEvent.STREAM_UNPUBLISHED, function (error, user) {
+      if (error) {
+        throw error;
+      }
+      dispatchStreamEvent(user, function (key) {
+        DataCache.remove(key);
+      });
+      unsubscribe(user);
+    });
     var dispatch = function dispatch(event, args) {
       switch (event) {
         case UpEvent.STREAM_PUBLISH:
@@ -7991,9 +8071,10 @@
       var getMSType = function getMSType(uris) {
         var check = function check(msType) {
           return utils.some(uris, function (_ref) {
-            var mediaType = _ref.mediaType;
+            var mediaType = _ref.mediaType,
+                state = _ref.state;
 
-            return utils.isEqual(msType, mediaType);
+            return utils.isEqual(msType, mediaType) && utils.isEqual(state, StreamState.ENABLE);
           });
         };
         var type = StreamType.NODE;

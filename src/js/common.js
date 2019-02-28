@@ -175,6 +175,43 @@
       win.document.body.removeChild(alertBox);
     };
   }
+  /** *
+   * toast 提示
+   * @param {string} str 提示信息
+   * @param {number} duration 展示时间
+  */
+  var SealToast = function(){ };
+  SealToast.prototype = {
+    create: function(str,duration) {
+      var self = this;
+      var toastHtml = '';
+      var toastText = '<div class="seal-toast-text">'+str+'</div>';
+      toastHtml = '<div class="seal-toast">'+toastText+'</div>';
+      if(Dom.get('.seal-toast')) return; //未hide禁止重复点击
+      document.body.insertAdjacentHTML('beforeend', toastHtml);
+      if(duration){
+        setTimeout(function(){
+          self.hide();
+        }, duration)
+      }
+    },
+    show: function() {
+      // var self = this;
+      Dom.showDom('.seal-toast');
+      Dom.get('.seal-toast').style.marginTop = '-'+Math.round(Dom.get('.seal-toast').offsetHeight/2)+'px';
+      if(Dom.get('.seal-toast')) return;
+    },
+    hide: function() {
+      // var self = this;
+      if(Dom.get('.seal-toast')){
+        Dom.hideDom('.seal-toast')
+      }
+    },
+    toast: function(str,duration){
+      var self = this;
+      return self.create(str,duration)
+    }
+  }
 
   /**
    * 音视频列表
@@ -266,14 +303,17 @@
     function closeVideoBySelf() {
       setClass(this.dom, OptClassName.CLOSE_VIDEO_BY_SELF, true);
       this.isVideoOpenedBySelf = false;
+      console.log('close my video')
     }
     function openVideoBySelf() {
       setClass(this.dom, OptClassName.CLOSE_VIDEO_BY_SELF, false);
       this.isVideoOpenedBySelf = true;
+      console.log('open my video')
     }
     function closeAudioBySelf() {
       setClass(this.dom, OptClassName.CLOSE_AUDIO_BY_SELF, true);
       this.isAudioOpenedBySelf = false;
+      console.log('close my audio')
     }
     function openAudioBySelf() {
       setClass(this.dom, OptClassName.CLOSE_AUDIO_BY_SELF, false);
@@ -393,6 +433,7 @@
 
   var common = {
     sealAlert: sealAlert,
+    SealToast: SealToast,
     formatResolution: formatResolution,
     getRTCToken: getRTCToken,
     getIMToken: getIMToken,
