@@ -335,7 +335,7 @@ ul, li {
   width: 120px;
   height: 100%;
   background-color: black;
-  margin: 0 15px;
+  margin: -46px 15px;
   position: relative;
   z-index: 15;
   border: 1px solid #b8bdc4;

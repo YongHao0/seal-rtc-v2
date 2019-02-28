@@ -158,11 +158,10 @@
 
   function showUserStream(user) {
     var id = user.id,
-      type = user.stream.type,
+      // type = user.stream.type,
       mediaStream = user.stream.mediaStream;
     var streamBox = StreamBox.get(id);
     streamBox.showStream(mediaStream);
-    setStreamBox(id, type);
   }
 
   function addUserStream(user) {
@@ -170,11 +169,13 @@
     if (isSelf) {
       showUserStream(user);
       userStreams.add(user);
+      setStreamBox(user.id, user.stream.mediaStream);
     } else {
       // user.stream.type = rongRTC.StreamType.AUDIO_AND_VIDEO;
       console.log(user.stream)
       rongRTCStream.subscribe(user).then(function (user) {
         showUserStream(user);
+        setStreamBox(user.id, user.stream.mediaStream);
         userStreams.add(user);
       }, function (error) {
         sealAlert(localeData.subscriptError + JSON.stringify(error));
